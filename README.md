@@ -26,7 +26,7 @@ A simple, secure, and scalable URL shortener built with Flask, MySQL, and Redis.
 - User signup and login with JWT-based authentication  
 - Shorten URLs with optional custom codes  
 - Redirect short URLs to original URLs  
-- Track clicks per URL (optional)  
+- Track clicks per URL 
 - Redis caching for faster redirects  
 - Rate limiting to prevent abuse  
 
