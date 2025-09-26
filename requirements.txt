@@ -1,0 +1,7 @@
+flask
+nanoid
+mysql-connector-python
+redis
+PyJWT
+bcrypt
+validators

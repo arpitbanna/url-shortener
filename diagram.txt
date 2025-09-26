@@ -1,0 +1,17 @@
++-----------------+
+|     Frontend    |  (Postman)
++-----------------+
+        |
+        v
++-----------------+
+|    Flask API    |  (Gunicorn)
+|  - Shorten URL  |
+|  - Redirect     |
+|  - Auth         |
+|  - Analytics    |
++-----------------+
+   |           |
+   v           v
++-------+   +------+
+| MySQL |   | Redis |  (cache for fast redirects)
++-------+   +------+
