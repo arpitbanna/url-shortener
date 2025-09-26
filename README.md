@@ -46,7 +46,7 @@ A simple, secure, and scalable URL shortener built with Flask, MySQL, and Redis.
 
 - Docker & Docker Compose  
 - Python 3.11 (if running outside Docker)  
-- MySQL client (optional, for DB inspection)  
+- MySQL client (for DB inspection)  
 
 ---
 
