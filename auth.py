@@ -4,13 +4,15 @@ import os
 from datetime import datetime, timedelta
 from functools import wraps
 from flask import request, jsonify
-import validators
+from uuid import uuid4
+PRIVATE_KEY = open(os.environ.get("JWT_PRIVATE_KEY", "private.pem"), "r").read()
+PUBLIC_KEY = open(os.environ.get("JWT_PUBLIC_KEY", "public.pem"), "r").read()
 
-JWT_SECRET = os.environ.get("JWT_SECRET", "secret")
-JWT_ALGORITHM = os.environ.get("JWT_ALGORITHM", "HS256")
-JWT_EXP_DELTA = 3600  # 1 hour
-JWT_SES_EXP_DELTA=3600*24*30
-
+JWT_ALGORITHM = os.environ.get("JWT_ALGORITHM", "RS256")
+JWT_EXP_DELTA = 900   # 15 minutes for access tokens
+JWT_SES_EXP_DELTA = 3600 * 24 * 30  # 30 days for refresh tokens
+JWT_ISSUER = os.environ.get("JWT_ISSUER","example.com")
+JWT_AUDIENCE = os.environ.get("JWT_AUDIENCE","example.com")
 
 # ---------------------------
 # Password Hashing
@@ -22,29 +24,49 @@ def hash_password(password: str) -> str:
 def check_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password.encode(), password_hash.encode())
 
+def hash_token(token:str)->str:
+    return bcrypt.hashpw(token.encode(),bcrypt.gensalt()).decode()
 
 # ---------------------------
 # JWT Helpers
 # ---------------------------
-def create_access_token(user_id:str)->str:
+def create_access_token(user_id: str) -> str:
     payload = {
-        "sub": user_id,  # subject = user id
+        "sub": user_id,
+        "iss": JWT_ISSUER,
+        "aud": JWT_AUDIENCE,
+        "iat": datetime.utcnow(),
+        "nbf": datetime.utcnow(),
         "exp": datetime.utcnow() + timedelta(seconds=JWT_EXP_DELTA),
+        "jti": str(uuid4()),  # unique token ID
         "type": "access",
     }
-    return jwt.encode(payload,JWT_SECRET,algorithm=JWT_ALGORITHM)
+    return jwt.encode(payload, PRIVATE_KEY, algorithm=JWT_ALGORITHM)
 
-def create_refresh_token(user_id:str)->str:
+
+def create_refresh_token(user_id: str,jti:str) -> str:
     payload = {
-        "sub": user_id,  # subject = user id
+        "sub": user_id,
+        "iss": JWT_ISSUER,
+        "aud": JWT_AUDIENCE,
+        "iat": datetime.utcnow(),
+        "nbf": datetime.utcnow(),
         "exp": datetime.utcnow() + timedelta(seconds=JWT_SES_EXP_DELTA),
+        "jti": jti,
         "type": "refresh",
     }
-    return jwt.encode(payload,JWT_SECRET,algorithm=JWT_ALGORITHM)
+    return jwt.encode(payload, PRIVATE_KEY, algorithm=JWT_ALGORITHM)
+
 
 def decode_jwt(token: str):
     try:
-        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return jwt.decode(
+            token,
+            PUBLIC_KEY,
+            algorithms=[JWT_ALGORITHM],
+            issuer=JWT_ISSUER,
+            audience=JWT_AUDIENCE,
+        )
     except jwt.ExpiredSignatureError:
         return None
     except jwt.InvalidTokenError:
@@ -79,6 +101,7 @@ def jwt_required(token_type: str = "access"):
 
             # Attach user_id for route handlers
             request.environ["user_id"] = payload["sub"]
+            request.environ["claims"]=payload
 
             return f(*args, **kwargs)
         return decorated

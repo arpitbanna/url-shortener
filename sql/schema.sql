@@ -12,6 +12,18 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE UNIQUE INDEX idx_username ON users(username);
 
 -- =====================================
+-- Refresh Tokens Table
+-- =====================================
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id CHAR(36) PRIMARY KEY,
+    token_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP,
+    user_id CHAR(36) NOT NULL,
+    CONSTRAINT fk_refresh_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- =====================================
 -- URLs Table
 -- =====================================
 CREATE TABLE IF NOT EXISTS urls (
@@ -21,7 +33,7 @@ CREATE TABLE IF NOT EXISTS urls (
     user_id CHAR(36) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     clicks INT DEFAULT 0,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    CONSTRAINT fk_urls_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_code ON urls(code);
@@ -41,7 +53,7 @@ CREATE TABLE IF NOT EXISTS url_clicks (
     user_agent TEXT,
     referrer TEXT,
     clicked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (url_id) REFERENCES urls(id) ON DELETE CASCADE
+    CONSTRAINT fk_url_clicks_url FOREIGN KEY (url_id) REFERENCES urls(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_url_clicks_url_id_clicked_at ON url_clicks(url_id, clicked_at);
@@ -50,6 +62,8 @@ CREATE INDEX idx_url_clicks_user_agent ON url_clicks(user_agent(50));
 CREATE INDEX idx_url_clicks_referrer ON url_clicks(referrer(50));
 CREATE INDEX idx_url_clicks_clicked_at ON url_clicks(clicked_at);
 CREATE INDEX idx_clicks_fingerprint ON url_clicks(fingerprint);
+CREATE INDEX idx_url_clicks_url_ip ON url_clicks(url_id, ip);
+CREATE INDEX idx_url_clicks_url_user_agent ON url_clicks(url_id, user_agent(50));
 
 -- =====================================
 -- Suspicious Clicks Table
@@ -62,7 +76,8 @@ CREATE TABLE IF NOT EXISTS suspicious_clicks (
     referrer TEXT,
     reason TEXT,
     url_code VARCHAR(10),
-    metadata TEXT
+    metadata TEXT,
+    CONSTRAINT fk_suspicious_clicks_url FOREIGN KEY (url_code) REFERENCES urls(code) ON DELETE CASCADE
 );
 
 -- =====================================
@@ -74,13 +89,14 @@ CREATE TABLE IF NOT EXISTS url_analytics_hourly (
     clicks INT DEFAULT 0,
     unique_visitors INT DEFAULT 0,
     suspicious_clicks INT DEFAULT 0,
-    PRIMARY KEY(url_id, date_hour)
+    PRIMARY KEY(url_id, date_hour),
+    CONSTRAINT fk_analytics_url FOREIGN KEY (url_id) REFERENCES urls(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_analytics_url_hour ON url_analytics_hourly(url_id, date_hour);
 
 -- =====================================
--- User Sequences Table (Behavioral)
+-- User Sequences Table (Behavioral Tracking)
 -- =====================================
 CREATE TABLE IF NOT EXISTS user_sequences (
     fingerprint CHAR(64) PRIMARY KEY,
@@ -97,7 +113,8 @@ CREATE TABLE IF NOT EXISTS url_referrers (
     url_id CHAR(36),
     referrer TEXT,
     clicks INT DEFAULT 0,
-    PRIMARY KEY(url_id, referrer)
+    PRIMARY KEY(url_id, referrer),
+    CONSTRAINT fk_referrers_url FOREIGN KEY (url_id) REFERENCES urls(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_referrers_url ON url_referrers(url_id);
@@ -112,15 +129,8 @@ CREATE TABLE IF NOT EXISTS user_statistics (
     total_urls INT DEFAULT 0,
     total_clicks INT DEFAULT 0,
     suspicious_clicks INT DEFAULT 0,
-    PRIMARY KEY(user_id, fingerprint)
+    PRIMARY KEY(user_id, fingerprint),
+    CONSTRAINT fk_user_statistics_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_user_statistics ON user_statistics(fingerprint);
-
--- =====================================
--- Additional Indexes
--- =====================================
--- Ensures fast querying for click rate per IP or URL
-CREATE INDEX idx_url_clicks_url_ip ON url_clicks(url_id, ip);
-CREATE INDEX idx_url_clicks_url_user_agent ON url_clicks(url_id, user_agent(50));
-

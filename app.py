@@ -4,7 +4,7 @@ from typing import Optional, TypedDict, cast
 import mysql.connector
 import nanoid
 from uuid import uuid4
-from auth import hash_password, check_password, create_refresh_token, create_access_token, jwt_required
+from auth import hash_password, check_password, create_refresh_token, create_access_token, jwt_required,hash_token
 import validators
 from errors import handle_errors, APIError
 from db import redis_client,get_connection
@@ -164,22 +164,42 @@ def login():
     data = request.get_json()
     username: str = data["username"]
     password: str = data["password"]
-    conn=get_connection()
-    cursor= conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM users WHERE username=%s", (username,))
-    row = cast(Optional[UserRow], cursor.fetchone())
-    cursor.close()
-    conn.close()
-    if not row or not check_password(password, row["password_hash"]):
-        logger.warning(f"Login failed for username: {username}")
-        return jsonify({"msg": "Bad credentials"}), 401
-    access_token = create_access_token(row["id"])
-    refresh_token = create_refresh_token(row["id"])
-    logger.info(f"User logged in: {username}")
-    return jsonify({
-        "access_token": access_token,
-        "refresh_token": refresh_token
-    })
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        # Fetch user
+        cursor.execute("SELECT * FROM users WHERE username=%s", (username,))
+        row = cast(Optional[UserRow], cursor.fetchone())
+
+        if not row or not check_password(password, row["password_hash"]):
+            logger.warning(f"Login failed for username: {username}")
+            return jsonify({"msg": "Bad credentials"}), 401
+
+        # Generate tokens
+        access_token = create_access_token(row["id"])
+        jti=str(uuid4())
+        refresh_token = create_refresh_token(row["id"],jti)
+        hashed_token = hash_token(refresh_token)
+
+        # Store refresh token in DB (hashed)
+        cursor.execute(
+            """
+            INSERT INTO refresh_tokens (id, token_hash, user_id, expires_at)
+            VALUES (%s, %s, %s, DATE_ADD(NOW(), INTERVAL 30 DAY))
+            """,
+            (jti, hashed_token, row["id"])
+        )
+        conn.commit()
+        logger.info(f"User logged in: {username}")
+        return jsonify({
+            "access_token": access_token,
+            "refresh_token": refresh_token
+        })
+    finally:
+        cursor.close()
+        conn.close()
 
 
 @app.route("/auth/access_token", methods=["POST"])
@@ -189,6 +209,32 @@ def access_token():
     token = create_access_token(user_id)
     logger.info(f"Issued access token for user_id: {user_id}")
     return jsonify({"access_token": token})
+
+@app.route("/auth/logout", methods=["POST"])
+@jwt_required(token_type="refresh")  # Only refresh token can be revoked
+@handle_errors
+def logout():
+    payload=request.environ["claims"]
+    user_id=request.environ["user_id"]
+    jti = payload.get("jti") if payload else None
+    if not jti:
+        return jsonify({"error": "Invalid token"}), 401
+
+    # Delete refresh token from DB
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "DELETE FROM refresh_tokens WHERE token_hash=%s AND user_id=%s",
+            (jti, user_id)
+        )
+        conn.commit()
+        logger.info(f"User {user_id} logged out, revoked refresh token {jti}")
+    finally:
+        cursor.close()
+        conn.close()
+
+    return jsonify({"msg": "Logged out successfully"}), 200
 
 
 # ---------------------------
@@ -263,7 +309,8 @@ def redirect_url(code: str):
     if not url_id:
         logger.warning(f"Redirect failed, URL ID not found in DB: {code}")
         return "URL not found", 404
-    log_click_task.delay(url_id, request.remote_addr, request.headers.get("User-Agent"), request.referrer)
+    log_click_task.delay(url_id, get_client_ip(), request.headers.get("User-Agent"), request.referrer)
+    check_fraud_task.delay(get_client_ip(),row["code"],request.headers.get("User-Agent"), request.referrer)
     cursor.close()
     conn.close()
     logger.info(f"URL clicked: {code} by IP {request.remote_addr}")
