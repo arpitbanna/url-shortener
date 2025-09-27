@@ -85,8 +85,8 @@ Prometheus: Collects metrics and exposes them for observability and alerting
 
 Docker & Docker Compose: Orchestrates services for development and production environments
 
-
-🔄 Flow Example
+---
+## 🔄 Flow Example
 
 User submits a long URL → Flask API generates a short code.
 
@@ -95,8 +95,8 @@ Client accesses short URL → Flask redirects to original URL.
 Click is logged asynchronously via Celery → Updates analytics and fraud checks.
 
 Metrics are updated → Prometheus scrapes for monitoring dashboards.
-
-⚡ Prerequisites
+---
+## ⚡ Prerequisites
 
 Docker & Docker Compose
 
@@ -106,7 +106,7 @@ MySQL client (for database inspection)
 
 Redis client (for caching and rate limiting)
 
-🚀 Getting Started
+## 🚀 Getting Started
 Clone Repository
 
 git clone https://github.com/yourusername/url-shortener.git
@@ -120,7 +120,7 @@ Start Services (Docker)
 
 Initialize Database
 
-📡 API Endpoints
+## 📡 API Endpoints
 
 POST /auth/signup → Create user
 
@@ -132,7 +132,7 @@ GET /<short_code> → Redirect to original URL
 
 GET /analytics/<url_id> → View click analytics
 
-⏱ Rate Limiting
+## ⏱ Rate Limiting
 
 Enforced per IP and per user using Redis
 
@@ -140,7 +140,7 @@ Prevents abuse and ensures fair usage
 
 Configurable thresholds via environment variables
 
-📊 Metrics & Analytics
+## 📊 Metrics & Analytics
 
 Prometheus metrics for:
 
@@ -156,7 +156,7 @@ Hourly aggregation in MySQL
 
 Fraud detection integrated with click logging
 
-🤝 Contributing
+## 🤝 Contributing
 
 Fork the repository
 
