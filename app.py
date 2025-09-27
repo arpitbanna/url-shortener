@@ -15,6 +15,8 @@ from tasks import log_click,check_fraud
 from prometheus_client import generate_latest,CONTENT_TYPE_LATEST
 from metrics import REQUEST_COUNT,REQUEST_LATENCY
 import time
+import json
+    
 log_click_task = cast(Task, log_click)
 check_fraud_task=cast(Task,check_fraud)
 # ---------------------------
@@ -216,7 +218,7 @@ def access_token():
 def logout():
     payload=request.environ["claims"]
     user_id=request.environ["user_id"]
-    jti = payload.get("jti") if payload else None
+    jti = payload.get("jti",None)
     if not jti:
         return jsonify({"error": "Invalid token"}), 401
 
@@ -347,6 +349,55 @@ def stats(code: str):
         "original_url": row["original_url"],
         "clicks": row["clicks"],
     })
+
+@app.route("/analytics/<code>", methods=["GET"])
+@jwt_required(token_type="access")
+def analytics(code: str):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    # Get URL info
+    cursor.execute("SELECT id FROM urls WHERE code=%s", (code,))
+    row = cursor.fetchone()
+    if not row:
+        return jsonify({"msg": "URL not found"}), 404
+    url_id = row["id"]
+
+    # Fetch hourly analytics
+    cursor.execute("""
+        SELECT DATE_FORMAT(date_hour, '%%Y-%%m-%%d %%H:00') as hour, clicks, unique_visitors, suspicious_clicks
+        FROM url_analytics_hourly
+        WHERE url_id=%s
+        ORDER BY date_hour ASC
+    """, (url_id,))
+    hourly_data = cursor.fetchall()
+
+    # Fetch top referrers
+    cursor.execute("""
+        SELECT referrer, clicks
+        FROM url_referrers
+        WHERE url_id=%s
+        ORDER BY clicks DESC
+        LIMIT 10
+    """, (url_id,))
+    top_referrers = cursor.fetchall()
+    
+    cursor.close()
+    conn.close()
+    return jsonify({
+        "hourly": hourly_data,
+        "top_referrers": top_referrers
+    })
+
+
+@app.route("/trending_urls", methods=["GET"])
+@jwt_required(token_type="access")
+def get_trendings():
+    trending_json = redis_client.get("trending_urls")  # type: ignore
+    if not trending_json:
+        return jsonify([]), 200
+    return jsonify(json.loads(trending_json)), 200  # type: ignore
+
 
 
 # ---------------------------

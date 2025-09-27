@@ -7,3 +7,7 @@ bcrypt
 validators
 celery
 prometheus-client
+geoip2
+pyyaml
+ua-parser 
+user-agents

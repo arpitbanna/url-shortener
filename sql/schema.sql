@@ -41,7 +41,7 @@ CREATE INDEX idx_user_id ON urls(user_id);
 CREATE INDEX idx_urls_user_id_created_at ON urls(user_id, created_at);
 CREATE INDEX idx_urls_code_user_id ON urls(code, user_id);
 CREATE INDEX idx_urls_created_at ON urls(created_at);
-
+ALTER TABLE urls ADD COLUMN trending_score DOUBLE DEFAULT 0;
 -- =====================================
 -- URL Clicks Table
 -- =====================================
