@@ -23,10 +23,19 @@ Supports user authentication, URL shortening, redirects, click analytics, trendi
 
 ## 📝 Project Overview
 
+<<<<<<< HEAD
 This project is a **scalable URL shortener service** that allows users to shorten URLs, track clicks, monitor analytics, and discover trending links.  
 It is optimized for **performance and security**, using Redis caching, MySQL analytics, and Celery workers for asynchronous tasks.
 
 The system also integrates **fraud detection** to prevent abuse, tracks **unique visitors**, and calculates **trending scores** using weighted recent clicks.
+=======
+- User signup and login with JWT-based authentication  
+- Shorten URLs with optional custom codes  
+- Redirect short URLs to original URLs  
+- Track clicks per URL 
+- Redis caching for faster redirects  
+- Rate limiting to prevent abuse  
+>>>>>>> 914ba508320b35321b632d9f8edbf2f584eb3920
 
 ---
 
@@ -63,8 +72,14 @@ The system also integrates **fraud detection** to prevent abuse, tracks **unique
 
 ## 🏗 Architecture
 
+<<<<<<< HEAD
 ```text
 Client: Sends requests to Flask API
+=======
+- Docker & Docker Compose  
+- Python 3.11 (if running outside Docker)  
+- MySQL client (for DB inspection)  
+>>>>>>> 914ba508320b35321b632d9f8edbf2f584eb3920
 
 Flask API: Handles auth, URL shortening, redirects, and analytics
 
