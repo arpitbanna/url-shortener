@@ -1,0 +1,22 @@
+global:
+  scrape_interval: 15s  # scrape every 15 seconds
+  evaluation_interval: 15s
+
+scrape_configs:
+  # 1️⃣ Flask app metrics (custom Prometheus endpoint)
+  - job_name: 'flask_app'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['flask-app:5000']
+
+  # 2️⃣ Redis metrics via official Redis exporter
+  - job_name: 'redis'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['redis:9121']  # default Redis exporter port
+
+  # 3️⃣ MySQL metrics via official MySQL exporter
+  - job_name: 'mysql'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['mysql-exporter:9104']

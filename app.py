@@ -1,15 +1,22 @@
 import logging
 from flask import Flask, request, jsonify, redirect
 from typing import Optional, TypedDict, cast
-import redis
 import mysql.connector
-import os
 import nanoid
 from uuid import uuid4
 from auth import hash_password, check_password, create_refresh_token, create_access_token, jwt_required
 import validators
 from errors import handle_errors, APIError
-
+from db import redis_client,get_connection
+from consts import RATE_LIMIT
+from celery import Task
+from typing import cast
+from tasks import log_click,check_fraud
+from prometheus_client import generate_latest,CONTENT_TYPE_LATEST
+from metrics import REQUEST_COUNT,REQUEST_LATENCY
+import time
+log_click_task = cast(Task, log_click)
+check_fraud_task=cast(Task,check_fraud)
 # ---------------------------
 # Logging setup
 # ---------------------------
@@ -19,7 +26,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-RATE_LIMIT = 10 
+
 
 # ---------------------------
 # TypedDicts for MySQL rows
@@ -37,29 +44,28 @@ class URLRow(TypedDict):
     clicks: int
     user_id: int
 
+class URLClickRow(TypedDict):
+    id:str
+    url_id:str
+    ip:str
+    user_agent:str
+    referrer:str
+    clicked_at:str
+
 
 # ---------------------------
 # App + Config
 # ---------------------------
 app = Flask(__name__)
 
-# Redis client
-redis_client = redis.Redis(
-    host=os.environ.get("REDIS_HOST", "redis"),
-    port=int(os.environ.get("REDIS_PORT", 6379)),
-    db=0,
-    decode_responses=True,
-)
 
-# MySQL connection
-conn = mysql.connector.connect(
-    host=os.environ.get("MYSQL_HOST", "db"),
-    user=os.environ.get("MYSQL_USER", "root"),
-    password=os.environ.get("MYSQL_PASSWORD", "password"),
-    database=os.environ.get("MYSQL_DB", "urlshortener"),
-)
-cursor = conn.cursor(dictionary=True)
-
+def get_client_ip():
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    if forwarded:
+        ip = forwarded.split(",")[0].strip()  # first IP is usually the client
+    else:
+        ip = request.remote_addr
+    return ip
 
 # ---------------------------
 # Rate limiting helper
@@ -78,6 +84,50 @@ def check_rate_limit(user_id: str) -> bool:
     logger.warning(f"Rate limit exceeded for user {user_id}")
     return False
 
+def check_ip_rate_limit(ip:str)->bool:
+    key=f"rate_ip:{ip}"
+    current:Optional[int]=redis_client.get(key) # type: ignore
+    if current is None:
+        redis_client.set(key,1,ex=60)
+        logger.info(f"Rate limit: new counter for new {ip}")
+        return True
+    elif current<RATE_LIMIT:
+        redis_client.incr(key)
+        logger.info(f"Rate limit: increment counter for ip {ip} ({int(current)+1})")
+        return True
+    logger.warning(f"Rate limit exceeded for ip {ip}")
+    return False
+
+
+# ---------------------------
+# Measure start time
+# ---------------------------
+@app.before_request
+def start_timer():
+    request.environ["start_time"]= time.time()  # store start timestamp
+
+# ---------------------------
+# Record metrics after request
+# ---------------------------
+@app.after_request
+def record_metrics(response):
+    # Increment request count
+    REQUEST_COUNT.labels(
+        request.method, 
+        request.path, 
+        response.status_code
+    ).inc()
+
+    # Measure latency
+    if hasattr(request, "start_time") and request.environ["start_time"] is not None:
+        latency = time.time() - request.environ["start_time"]
+        REQUEST_LATENCY.labels(request.path).observe(latency)
+    return response
+
+@app.route('/metrics')
+def metrics():
+    """ Exposes application metrics in a Prometheus-compatible format. """
+    return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
 
 # ---------------------------
 # Auth routes
@@ -90,8 +140,9 @@ def signup():
     password: str = data["password"]
 
     pw_hash = hash_password(password)
-
-    try:
+    conn=get_connection()
+    cursor= conn.cursor(dictionary=True)
+    try:    
         cursor.execute(
             "INSERT INTO users (id, username, password_hash) VALUES (%s, %s, %s)",
             (str(uuid4()), username, pw_hash),
@@ -102,6 +153,9 @@ def signup():
     except mysql.connector.errors.IntegrityError:
         logger.warning(f"Signup failed: Username {username} already exists")
         return jsonify({"msg": "Username already exists"}), 400
+    finally:
+        cursor.close()
+        conn.close()
 
 
 @app.route("/auth/login", methods=["POST"])
@@ -110,14 +164,15 @@ def login():
     data = request.get_json()
     username: str = data["username"]
     password: str = data["password"]
-
+    conn=get_connection()
+    cursor= conn.cursor(dictionary=True)
     cursor.execute("SELECT * FROM users WHERE username=%s", (username,))
     row = cast(Optional[UserRow], cursor.fetchone())
-
+    cursor.close()
+    conn.close()
     if not row or not check_password(password, row["password_hash"]):
         logger.warning(f"Login failed for username: {username}")
         return jsonify({"msg": "Bad credentials"}), 401
-
     access_token = create_access_token(row["id"])
     refresh_token = create_refresh_token(row["id"])
     logger.info(f"User logged in: {username}")
@@ -147,8 +202,10 @@ def shorten_url():
     data = request.get_json()
     original_url: str = data["url"]
     code: str = data.get("code")
-
-    if not check_rate_limit(user_id):
+    ip_addr=get_client_ip()
+    if ip_addr is None:
+        return jsonify({}),429
+    if not check_rate_limit(user_id) or not check_ip_rate_limit(ip_addr):
         logger.warning(f"Rate limit exceeded for user {user_id}")
         return jsonify({"error": f"Rate limit exceeded: {RATE_LIMIT} requests per minute"}), 429
 
@@ -158,12 +215,15 @@ def shorten_url():
 
     if not code:
         code = nanoid.generate(size=8)
-
+    conn=get_connection()
+    cursor= conn.cursor(dictionary=True)    
     cursor.execute(
         "INSERT INTO urls (id, code, original_url, user_id) VALUES (%s, %s, %s, %s)",
         (str(uuid4()), code, original_url, user_id),
     )
     conn.commit()
+    cursor.close()
+    conn.close()
     redis_client.set(code, original_url, ex=86400)  # cache 1 day
     logger.info(f"URL shortened by user {user_id}: {original_url} -> {code}")
 
@@ -173,47 +233,42 @@ def shorten_url():
 @app.route("/<code>")
 @handle_errors
 def redirect_url(code: str):
+    ip =get_client_ip()
+    user_agent = request.headers.get("User-Agent")
+    referrer = request.referrer
+    # Queue fraud check asynchronously
+    check_fraud_task.delay(ip, code, user_agent, referrer)
     # Try Redis first
     original_url = redis_client.get(code)
     url_id = None
-
     # Always query DB if Redis misses
+    conn=get_connection()
+    cursor= conn.cursor(dictionary=True)
+  
     if not original_url:
         cursor.execute("SELECT * FROM urls WHERE code=%s", (code,))
         row = cursor.fetchone()
         if not row:
             logger.warning(f"Redirect failed, code not found: {code}")
             return "URL not found", 404
-        original_url = row["original_url"]
-        url_id = row["id"]
-        redis_client.set(code, original_url, ex=86400)
+        original_url = row["original_url"] # pyright: ignore[reportArgumentType, reportCallIssue]
+        url_id = row["id"] # pyright: ignore[reportArgumentType, reportCallIssue]
+        redis_client.set(code, original_url, ex=86400) # pyright: ignore[reportArgumentType]
     else:
         # Even if cached, get url_id from DB
         cursor.execute("SELECT id FROM urls WHERE code=%s", (code,))
         row = cursor.fetchone()
-        url_id = row["id"] if row else None
+        url_id = row["id"] if row else None # type: ignore
 
     if not url_id:
         logger.warning(f"Redirect failed, URL ID not found in DB: {code}")
         return "URL not found", 404
-
-    # Log click
-    cursor.execute(
-        """INSERT INTO url_clicks (id, url_id, ip, user_agent, referrer) 
-           VALUES (%s, %s, %s, %s, %s)""",
-        (
-            str(uuid4()),
-            url_id,
-            request.remote_addr,
-            request.headers.get("User-Agent"),
-            request.referrer,
-        ),
-    )
-    cursor.execute("UPDATE urls SET clicks = clicks + 1 WHERE id=%s", (url_id,))
-    conn.commit()
+    log_click_task.delay(url_id, request.remote_addr, request.headers.get("User-Agent"), request.referrer)
+    cursor.close()
+    conn.close()
     logger.info(f"URL clicked: {code} by IP {request.remote_addr}")
 
-    return redirect(original_url)
+    return redirect(original_url) # type: ignore
 
 
 
@@ -225,18 +280,21 @@ def redirect_url(code: str):
 @handle_errors
 def stats(code: str):
     user_id: str = request.environ["user_id"]
-
-    if not check_rate_limit(user_id):
-        logger.warning(f"Rate limit exceeded for stats endpoint for user {user_id}")
+    ip_addr=get_client_ip()
+    if ip_addr is None:
+        return jsonify({}),429
+    if not check_rate_limit(user_id) or not check_ip_rate_limit(ip_addr):
+        logger.warning(f"Rate limit exceeded for user {user_id}")
         return jsonify({"error": f"Rate limit exceeded: {RATE_LIMIT} requests per minute"}), 429
-
+    conn=get_connection()
+    cursor= conn.cursor(dictionary=True)
     cursor.execute("SELECT * FROM urls WHERE code=%s", (code,))
     row = cast(Optional[URLRow], cursor.fetchone())
-
+    cursor.close()
+    conn.close()
     if not row or row["user_id"] != user_id:
         logger.warning(f"Stats access unauthorized for user {user_id}, code {code}")
         return jsonify({"msg": "Not found or unauthorized"}), 404
-
     logger.info(f"Stats retrieved for user {user_id}, code {code}")
     return jsonify({
         "original_url": row["original_url"],

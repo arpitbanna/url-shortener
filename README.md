@@ -1,6 +1,6 @@
 # URL Shortener API
 
-A simple, secure, and scalable URL shortener built with Flask, MySQL, and Redis. This project supports user authentication, URL shortening, redirects, and click analytics.
+A simple, secure, and scalable URL shortener built with **Flask, MySQL, and Redis**. Supports user authentication, URL shortening, redirects, and click analytics.
 
 ---
 
@@ -10,10 +10,10 @@ A simple, secure, and scalable URL shortener built with Flask, MySQL, and Redis.
 - [Tech Stack](#tech-stack)  
 - [Prerequisites](#prerequisites)  
 - [Getting Started](#getting-started)  
-  - [1. Clone Repository](#1-clone-repository)  
-  - [2. Setup Environment Variables](#2-setup-environment-variables)  
-  - [3. Start Services](#3-start-services)  
-  - [4. Initialize Database](#4-initialize-database)  
+  - [Clone Repository](#clone-repository)  
+  - [Setup Environment Variables](#setup-environment-variables)  
+  - [Start Services](#start-services)  
+  - [Initialize Database](#initialize-database)  
 - [API Endpoints](#api-endpoints)  
 - [Rate Limiting](#rate-limiting)  
 - [Contributing](#contributing)  
@@ -23,12 +23,13 @@ A simple, secure, and scalable URL shortener built with Flask, MySQL, and Redis.
 
 ## Features
 
-- User signup and login with JWT-based authentication  
-- Shorten URLs with optional custom codes  
-- Redirect short URLs to original URLs  
-- Track clicks per URL (optional)  
+- User signup and login with **JWT-based authentication**  
+- Shorten URLs with **custom codes**  
+- Redirect short URLs to **original URLs**  
+- Track clicks and **URL analytics** per user  
 - Redis caching for faster redirects  
-- Rate limiting to prevent abuse  
+- **Rate limiting** per user and per IP  
+- Optional logging of **IP, user agent, and referrer**  
 
 ---
 
@@ -46,13 +47,14 @@ A simple, secure, and scalable URL shortener built with Flask, MySQL, and Redis.
 
 - Docker & Docker Compose  
 - Python 3.11 (if running outside Docker)  
-- MySQL client (optional, for DB inspection)  
+- MySQL client (for DB inspection)  
+- Redis client (for caching)
 
 ---
 
 ## Getting Started
 
-### 1. Clone Repository
+### Clone Repository
 
 ```bash
 git clone https://github.com/yourusername/url-shortener.git

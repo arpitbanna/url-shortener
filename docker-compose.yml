@@ -1,4 +1,4 @@
-
+version: "3.9"
 
 services:
   flask-app:
@@ -7,29 +7,35 @@ services:
     ports:
       - "5000:5000"
     env_file:
-      - .env  # live code reload during development
+      - .env
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
+    networks:
+      - monitoring
+    environment:
+      - PROMETHEUS_MULTIPROC_DIR=/tmp
 
   db:
     image: mysql:8.0
     container_name: mysql-db
     restart: always
     environment:
-        MYSQL_ROOT_PASSWORD: example   # REQUIRED on first init
-        MYSQL_DATABASE: urlshortener       # optional: auto-create DB
+      MYSQL_ROOT_PASSWORD: example
+      MYSQL_DATABASE: urlshortener
     ports:
       - "3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_PASSWORD}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - monitoring
 
   redis:
     image: redis:7
@@ -38,7 +44,62 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    networks:
+      - monitoring
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus:/etc/prometheus
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring
+    volumes:
+      - grafana-data:/var/lib/grafana
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-exporter
+    ports:
+      - "9121:9121"
+    environment:
+      - REDIS_ADDR=redis:6379
+    networks:
+      - monitoring
+    depends_on:
+      - redis
+  mysql-exporter:
+    image: prom/mysqld-exporter:latest
+    container_name: mysql-exporter
+    environment:
+      - DATA_SOURCE_NAME=root:example@(mysql-db:3306)/
+    ports:
+      - "9104:9104"
+    networks:
+      - monitoring
+    depends_on:
+      - db
+    
+    
 volumes:
   mysql-data:
   redis-data:
+  grafana-data:
+
+networks:
+  monitoring:
+    driver: bridge

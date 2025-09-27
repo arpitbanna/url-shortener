@@ -5,3 +5,5 @@ redis
 PyJWT
 bcrypt
 validators
+celery
+prometheus-client
