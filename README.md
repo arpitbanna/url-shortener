@@ -23,36 +23,34 @@ Supports user authentication, URL shortening, redirects, click analytics, trendi
 
 ## 📝 Project Overview
 
-<<<<<<< HEAD
-This project is a **scalable URL shortener service** that allows users to shorten URLs, track clicks, monitor analytics, and discover trending links.  
-It is optimized for **performance and security**, using Redis caching, MySQL analytics, and Celery workers for asynchronous tasks.
+This project is a **scalable URL shortener service** designed for **high performance, security, and observability**.  
+It allows users to:
 
-The system also integrates **fraud detection** to prevent abuse, tracks **unique visitors**, and calculates **trending scores** using weighted recent clicks.
-=======
-- User signup and login with JWT-based authentication  
 - Shorten URLs with optional custom codes  
-- Redirect short URLs to original URLs  
-- Track clicks per URL 
-- Redis caching for faster redirects  
-- Rate limiting to prevent abuse  
->>>>>>> 914ba508320b35321b632d9f8edbf2f584eb3920
+- Redirect short URLs to their original destinations  
+- Track detailed click analytics including unique visitors, top referrers, and suspicious clicks  
+- Discover trending URLs based on weighted recent clicks  
+- Protect against abuse with fraud detection and rate limiting  
+
+The system leverages **Redis** for caching and rate limiting, **MySQL** for persistent storage, and **Celery** for asynchronous tasks.  
+Prometheus metrics are exposed for monitoring traffic, clicks, and suspicious activity.
 
 ---
 
 ## ✨ Features
 
-- **User Authentication:** Sign up, login, refresh tokens, and logout with **JWT-based authentication**  
+- **User Authentication:** Sign up, login, refresh tokens, and logout with **JWT**  
 - **URL Shortening:** Generate short links with optional custom codes  
-- **Redirect Service:** Quickly redirect to original URLs while logging clicks  
-- **Click Analytics:** Hourly analytics including:
+- **Redirect Service:** Efficiently redirect while logging clicks asynchronously  
+- **Click Analytics:** Hourly aggregation of:
   - Total clicks  
   - Unique visitors  
   - Suspicious clicks (fraud detection)  
   - Top referrers  
-- **Trending URLs:** Weighted recent clicks with exponential decay  
-- **Fraud Detection:** Fingerprint, velocity, and behavior checks  
+- **Trending URLs:** Weighted scoring with exponential decay for recent clicks  
+- **Fraud Detection:** Fingerprint, velocity, and behavior checks to prevent abuse  
 - **Rate Limiting:** Per-user and per-IP using Redis  
-- **Observability:** Prometheus metrics for requests, latency, clicks, and suspicious activity  
+- **Observability:** Prometheus metrics for requests, latency, and suspicious activity  
 - **Caching:** Redis cache for faster redirects and trending URL retrieval  
 
 ---
@@ -72,21 +70,102 @@ The system also integrates **fraud detection** to prevent abuse, tracks **unique
 
 ## 🏗 Architecture
 
-<<<<<<< HEAD
 ```text
 Client: Sends requests to Flask API
-=======
-- Docker & Docker Compose  
-- Python 3.11 (if running outside Docker)  
-- MySQL client (for DB inspection)  
->>>>>>> 914ba508320b35321b632d9f8edbf2f584eb3920
 
-Flask API: Handles auth, URL shortening, redirects, and analytics
+Flask API: Handles authentication, URL shortening, redirects, analytics, and rate limiting
 
-Redis: Caches short URLs, trending URLs, and enforces rate limits
+Redis: Caches short URLs, trending URLs, enforces rate limits, and stores session-like data
 
-MySQL: Stores users, URLs, clicks, hourly analytics, and sequences
+MySQL: Persistent storage for users, URLs, clicks, hourly analytics, and sequences
 
-Celery Workers: Handle asynchronous click logging and fraud detection
+Celery Workers: Asynchronous processing of click logs and fraud detection
 
-Prometheus: Collects and exposes metrics for observability
+Prometheus: Collects metrics and exposes them for observability and alerting
+
+Docker & Docker Compose: Orchestrates services for development and production environments
+
+
+🔄 Flow Example
+
+User submits a long URL → Flask API generates a short code.
+
+Client accesses short URL → Flask redirects to original URL.
+
+Click is logged asynchronously via Celery → Updates analytics and fraud checks.
+
+Metrics are updated → Prometheus scrapes for monitoring dashboards.
+
+⚡ Prerequisites
+
+Docker & Docker Compose
+
+Python 3.11 (if running outside Docker)
+
+MySQL client (for database inspection)
+
+Redis client (for caching and rate limiting)
+
+🚀 Getting Started
+Clone Repository
+
+git clone https://github.com/yourusername/url-shortener.git
+cd url-shortener
+
+Setup Environment Variables
+
+Create a .env file:
+
+Start Services (Docker)
+
+Initialize Database
+
+📡 API Endpoints
+
+POST /auth/signup → Create user
+
+POST /auth/login → Obtain JWT
+
+POST /url/shorten → Shorten a URL
+
+GET /<short_code> → Redirect to original URL
+
+GET /analytics/<url_id> → View click analytics
+
+⏱ Rate Limiting
+
+Enforced per IP and per user using Redis
+
+Prevents abuse and ensures fair usage
+
+Configurable thresholds via environment variables
+
+📊 Metrics & Analytics
+
+Prometheus metrics for:
+
+Requests per endpoint
+
+Request latency
+
+Click counts (total, unique, suspicious)
+
+Trending URLs
+
+Hourly aggregation in MySQL
+
+Fraud detection integrated with click logging
+
+🤝 Contributing
+
+Fork the repository
+
+Create your feature branch (git checkout -b feature/my-feature)
+
+Commit changes (git commit -am 'Add new feature')
+
+Push to branch (git push origin feature/my-feature)
+
+Open a pull request
+
+MIT License © 2025 Salih Yılboğa
