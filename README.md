@@ -1,7 +1,7 @@
 # URL Shortener API 🚀
 
-A **lightweight, secure, and production-ready URL shortener** built with **Flask, MySQL, Redis, and Celery**.  
-Supports user authentication, URL shortening, redirects, click analytics, trending URLs, and fraud detection.
+A **lightweight, secure, and production-ready URL shortener service** built for high performance using **Flask, MySQL, Redis, and Celery**.  
+It provides **user authentication, real-time click analytics, trending URLs, and built-in fraud detection**, making it ideal for both production and experimental setups.
 
 ---
 
@@ -10,12 +10,12 @@ Supports user authentication, URL shortening, redirects, click analytics, trendi
 - [Project Overview](#project-overview)  
 - [Features](#features)  
 - [Tech Stack](#tech-stack)  
-- [Architecture](#architecture)  
+- [Architecture & Flow](#architecture--flow)  
 - [Prerequisites](#prerequisites)  
 - [Getting Started](#getting-started)  
 - [API Endpoints](#api-endpoints)  
-- [Rate Limiting](#rate-limiting)  
-- [Metrics & Analytics](#metrics--analytics)  
+- [Rate Limiting & Security](#rate-limiting--security)  
+- [Metrics & Observability](#metrics--observability)  
 - [Contributing](#contributing)  
 - [License](#license)  
 
@@ -23,149 +23,97 @@ Supports user authentication, URL shortening, redirects, click analytics, trendi
 
 ## 📝 Project Overview
 
-This project is a **scalable URL shortener service** designed for **high performance, security, and observability**.  
-It allows users to:
+This is a **scalable URL shortener** focused on **performance, security, and observability**. It doesn’t just shorten links — it **tracks analytics, prevents abuse, and identifies trending content**.
 
-- Shorten URLs with optional custom codes  
-- Redirect short URLs to their original destinations  
-- Track detailed click analytics including unique visitors, top referrers, and suspicious clicks  
-- Discover trending URLs based on weighted recent clicks  
-- Protect against abuse with fraud detection and rate limiting  
+**Core Capabilities:**
 
-The system leverages **Redis** for caching and rate limiting, **MySQL** for persistent storage, and **Celery** for asynchronous tasks.  
-Prometheus metrics are exposed for monitoring traffic, clicks, and suspicious activity.
+* **Shortening:** Automatic or custom short codes for URLs.  
+* **Analytics:** Track clicks, unique visitors, and referrers.  
+* **Security:** Fraud detection and strict rate limiting.  
+* **Trending URLs:** Weighted scoring based on recent activity.  
+
+**Architecture Highlights:**
+
+* **Redis:** Fast caching for redirects and rate enforcement.  
+* **MySQL:** Persistent storage for URLs and analytics.  
+* **Celery:** Background processing for click logging and fraud checks.
 
 ---
 
 ## ✨ Features
 
-- **User Authentication:** Sign up, login, refresh tokens, and logout with **JWT**  
-- **URL Shortening:** Generate short links with optional custom codes  
-- **Redirect Service:** Efficiently redirect while logging clicks asynchronously  
-- **Click Analytics:** Hourly aggregation of:
-  - Total clicks  
-  - Unique visitors  
-  - Suspicious clicks (fraud detection)  
-  - Top referrers  
-- **Trending URLs:** Weighted scoring with exponential decay for recent clicks  
-- **Fraud Detection:** Fingerprint, velocity, and behavior checks to prevent abuse  
-- **Rate Limiting:** Per-user and per-IP using Redis  
-- **Observability:** Prometheus metrics for requests, latency, and suspicious activity  
-- **Caching:** Redis cache for faster redirects and trending URL retrieval  
+| Category | Feature | Description |
+| :--- | :--- | :--- |
+| **Authentication** | Secure Access | Sign up, login, and refresh tokens via **JWT**. |
+| **URL Management** | Custom Codes | Auto-generate or allow user-defined short codes. |
+| **Performance** | Fast Redirects | Low-latency redirects leveraging **Redis caching**. |
+| **Analytics** | Click Tracking | Async logging with hourly aggregation of clicks, unique visitors, and top referrers. |
+| **Trending** | Weighted Score | Exponential decay scoring for recent activity on URLs. |
+| **Security** | Fraud Detection | Detect suspicious clicks using behavior and velocity checks. |
+| **Abuse Prevention** | Rate Limiting | Enforced per-user and per-IP via Redis. |
+| **Observability** | Prometheus Metrics | Track request counts, latency, and flagged activity. |
 
 ---
 
 ## 🛠 Tech Stack
 
-- **Backend:** Python 3.11, Flask  
-- **Database:** MySQL 8.0  
-- **Cache / Rate Limiting:** Redis 7  
-- **Async Tasks:** Celery + Redis  
-- **Authentication:** JWT (access + refresh tokens)  
-- **Containerization:** Docker, Docker Compose  
-- **Monitoring:** Prometheus  
-- **Analytics:** Hourly aggregation & trending calculation  
+| Component | Technology | Role |
+| :--- | :--- | :--- |
+| **Backend** | Python 3.11, Flask | Core application framework. |
+| **Database** | MySQL 8.0 | Persistent storage for users, URLs, and analytics. |
+| **Caching / Rate Limiting** | Redis 7 | High-speed store for redirects, trending data, and rate limits. |
+| **Task Queuing** | Celery + Redis | Async processing of click logs and fraud detection. |
+| **Containerization** | Docker, Docker Compose | Development and production orchestration. |
+| **Monitoring** | Prometheus | Metrics collection and exposure. |
+| **Authentication** | JWT | Secure, stateless user authentication. |
 
 ---
 
-## 🏗 Architecture
+## 🏗 Architecture & Flow
+
+The system separates **fast synchronous operations** (redirects) from **heavy async work** (analytics, fraud checks).
 
 ```text
-Client: Sends requests to Flask API
+Client (Browser/App)
+       ↓
+Flask API (Auth, Rate Limiting, Shortening)
+       ↓
+Redis (Cache / Rate Limits) ↔ MySQL (Persistent Storage)
+       ↓
+Celery (Async Click Logging / Fraud Checks)
+       ↓
+Prometheus (Metrics)
 
-Flask API: Handles authentication, URL shortening, redirects, analytics, and rate limiting
+### 🔄 Flow Example
 
-Redis: Caches short URLs, trending URLs, enforces rate limits, and stores session-like data
+1. **User shortens a URL:**  
+   Client sends long URL → Flask API generates a short code → stores in MySQL + caches in Redis.
 
-MySQL: Persistent storage for users, URLs, clicks, hourly analytics, and sequences
+2. **Client accesses short URL:**  
+   Hits `/short_code` → Flask retrieves original URL from Redis → redirects.
 
-Celery Workers: Asynchronous processing of click logs and fraud detection
+3. **Click is logged:**  
+   Flask pushes click data (IP, User-Agent) to Celery queue.
 
-Prometheus: Collects metrics and exposes them for observability and alerting
+4. **Celery processes click:**  
+   Worker performs fraud check → updates logs → recalculates hourly analytics and trending scores.
 
-Docker & Docker Compose: Orchestrates services for development and production environments
+5. **Monitoring:**  
+   Prometheus scrapes Flask API for metrics.
 
 ---
-## 🔄 Flow Example
 
-User submits a long URL → Flask API generates a short code.
-
-Client accesses short URL → Flask redirects to original URL.
-
-Click is logged asynchronously via Celery → Updates analytics and fraud checks.
-
-Metrics are updated → Prometheus scrapes for monitoring dashboards.
----
 ## ⚡ Prerequisites
 
-Docker & Docker Compose
+* Docker & Docker Compose  
+* Python 3.11 (if running Flask outside Docker)
 
-Python 3.11 (if running outside Docker)
-
-MySQL client (for database inspection)
-
-Redis client (for caching and rate limiting)
+---
 
 ## 🚀 Getting Started
-Clone Repository
 
+### 1. Clone Repository
+
+```bash
 git clone https://github.com/yourusername/url-shortener.git
 cd url-shortener
-
-Setup Environment Variables
-
-Create a .env file:
-
-Start Services (Docker)
-
-Initialize Database
-
-## 📡 API Endpoints
-
-POST /auth/signup → Create user
-
-POST /auth/login → Obtain JWT
-
-POST /url/shorten → Shorten a URL
-
-GET /<short_code> → Redirect to original URL
-
-GET /analytics/<url_id> → View click analytics
-
-## ⏱ Rate Limiting
-
-Enforced per IP and per user using Redis
-
-Prevents abuse and ensures fair usage
-
-Configurable thresholds via environment variables
-
-## 📊 Metrics & Analytics
-
-Prometheus metrics for:
-
-Requests per endpoint
-
-Request latency
-
-Click counts (total, unique, suspicious)
-
-Trending URLs
-
-Hourly aggregation in MySQL
-
-Fraud detection integrated with click logging
-
-## 🤝 Contributing
-
-Fork the repository
-
-Create your feature branch (git checkout -b feature/my-feature)
-
-Commit changes (git commit -am 'Add new feature')
-
-Push to branch (git push origin feature/my-feature)
-
-Open a pull request
-
-MIT License © 2025 Salih Yılboğa
