@@ -7,7 +7,7 @@ from uuid import uuid4
 from auth import hash_password, check_password, create_refresh_token, create_access_token, jwt_required,hash_token
 import validators
 from errors import handle_errors, APIError
-from db import redis_client,get_connection
+from db import redis_client,get_connection,safe_close
 from consts import RATE_LIMIT
 from celery import Task
 from typing import cast
@@ -16,6 +16,7 @@ from prometheus_client import generate_latest,CONTENT_TYPE_LATEST
 from metrics import REQUEST_COUNT,REQUEST_LATENCY
 import time
 import json
+from fraud import get_fingerprint
     
 log_click_task = cast(Task, log_click)
 check_fraud_task=cast(Task,check_fraud)
@@ -86,18 +87,15 @@ def check_rate_limit(user_id: str) -> bool:
     logger.warning(f"Rate limit exceeded for user {user_id}")
     return False
 
-def check_ip_rate_limit(ip:str)->bool:
-    key=f"rate_ip:{ip}"
-    current:Optional[int]=redis_client.get(key) # type: ignore
+def check_ip_rate_limit(ip: str) -> bool:
+    key = f"rate_ip:{ip}"
+    current: Optional[str] = redis_client.get(key)
     if current is None:
-        redis_client.set(key,1,ex=60)
-        logger.info(f"Rate limit: new counter for new {ip}")
+        redis_client.set(key, 1, ex=60)
         return True
-    elif current<RATE_LIMIT:
+    elif int(current) < RATE_LIMIT:  # <-- cast to int
         redis_client.incr(key)
-        logger.info(f"Rate limit: increment counter for ip {ip} ({int(current)+1})")
         return True
-    logger.warning(f"Rate limit exceeded for ip {ip}")
     return False
 
 
@@ -157,7 +155,7 @@ def signup():
         return jsonify({"msg": "Username already exists"}), 400
     finally:
         cursor.close()
-        conn.close()
+        safe_close(conn)
 
 
 @app.route("/auth/login", methods=["POST"])
@@ -201,7 +199,7 @@ def login():
         })
     finally:
         cursor.close()
-        conn.close()
+        safe_close(conn)
 
 
 @app.route("/auth/access_token", methods=["POST"])
@@ -234,7 +232,7 @@ def logout():
         logger.info(f"User {user_id} logged out, revoked refresh token {jti}")
     finally:
         cursor.close()
-        conn.close()
+        safe_close(conn)
 
     return jsonify({"msg": "Logged out successfully"}), 200
 
@@ -271,7 +269,7 @@ def shorten_url():
     )
     conn.commit()
     cursor.close()
-    conn.close()
+    safe_close(conn)
     redis_client.set(code, original_url, ex=86400)  # cache 1 day
     logger.info(f"URL shortened by user {user_id}: {original_url} -> {code}")
 
@@ -284,8 +282,6 @@ def redirect_url(code: str):
     ip =get_client_ip()
     user_agent = request.headers.get("User-Agent")
     referrer = request.referrer
-    # Queue fraud check asynchronously
-    check_fraud_task.delay(ip, code, user_agent, referrer)
     # Try Redis first
     original_url = redis_client.get(code)
     url_id = None
@@ -304,17 +300,18 @@ def redirect_url(code: str):
         redis_client.set(code, original_url, ex=86400) # pyright: ignore[reportArgumentType]
     else:
         # Even if cached, get url_id from DB
-        cursor.execute("SELECT id FROM urls WHERE code=%s", (code,))
+        cursor.execute("SELECT id, code FROM urls WHERE code=%s", (code,))
         row = cursor.fetchone()
         url_id = row["id"] if row else None # type: ignore
-
+        url_code = row["code"] if row else code #type: ignore
     if not url_id:
         logger.warning(f"Redirect failed, URL ID not found in DB: {code}")
         return "URL not found", 404
-    log_click_task.delay(url_id, get_client_ip(), request.headers.get("User-Agent"), request.referrer)
-    check_fraud_task.delay(get_client_ip(),row["code"],request.headers.get("User-Agent"), request.referrer)
+    fingerprint = get_fingerprint()
+    log_click_task.delay(url_id, get_client_ip(), request.headers.get("User-Agent"), request.referrer, fingerprint)
+    check_fraud_task.delay(get_client_ip(), url_code, request.headers.get("User-Agent"), request.referrer, fingerprint) # type: ignore# type: ignore
     cursor.close()
-    conn.close()
+    safe_close(conn)
     logger.info(f"URL clicked: {code} by IP {request.remote_addr}")
 
     return redirect(original_url) # type: ignore
@@ -340,7 +337,7 @@ def stats(code: str):
     cursor.execute("SELECT * FROM urls WHERE code=%s", (code,))
     row = cast(Optional[URLRow], cursor.fetchone())
     cursor.close()
-    conn.close()
+    safe_close(conn)
     if not row or row["user_id"] != user_id:
         logger.warning(f"Stats access unauthorized for user {user_id}, code {code}")
         return jsonify({"msg": "Not found or unauthorized"}), 404
@@ -383,7 +380,7 @@ def analytics(code: str):
     top_referrers = cursor.fetchall()
     
     cursor.close()
-    conn.close()
+    safe_close(conn)
     return jsonify({
         "hourly": hourly_data,
         "top_referrers": top_referrers

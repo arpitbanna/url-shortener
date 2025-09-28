@@ -3,6 +3,7 @@ nanoid
 mysql-connector-python
 redis
 PyJWT
+cryptography
 bcrypt
 validators
 celery
@@ -11,3 +12,9 @@ geoip2
 pyyaml
 ua-parser 
 user-agents
+python-dotenv
+
+
+pytest
+pytest-mock
+requests

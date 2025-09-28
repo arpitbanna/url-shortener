@@ -1,10 +1,16 @@
-from celery import Celery
-from db import get_connection,redis_client
-from uuid import uuid4
-from consts import REDIS_HOST, REDIS_PORT
 import logging
 import json
-from fraud import get_fingerprint, is_fraud, check_velocity, check_behavior
+from uuid import uuid4
+from datetime import datetime
+
+from celery import Celery
+from celery.schedules import crontab
+import geoip2.database
+import user_agents
+
+from db import get_connection, redis_client,safe_close
+from consts import REDIS_HOST, REDIS_PORT
+from fraud import is_fraud, check_velocity, check_behavior
 from metrics import (
     UNIQUE_VISITORS,
     TOP_REFERRERS,
@@ -18,42 +24,49 @@ from metrics import (
     SUSPICIOUS_REQUESTS
 )
 from analytics import increment_hourly_analytics, update_user_sequence
-import geoip2.database
-import user_agents
-from datetime import datetime
-from celery.schedules import crontab
 
-
-celery = Celery('tasks', broker=f'redis://{REDIS_HOST}:{REDIS_PORT}/0')
+# ---------- Logging ----------
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# ---------- Celery ----------
+celery = Celery("tasks", broker=f"redis://{REDIS_HOST}:{REDIS_PORT}/0")
+
 celery.conf.update(
-       beat_schedule={
-        'update-trending-scores-every-5-minutes': {
-            'task': 'tasks.update_trending_urls',
-            'schedule': crontab(minute='*/30'),
+    beat_schedule={
+        "update-trending-scores-every-1-minute": {
+            "task": "tasks.update_trending_urls",
+            "schedule": crontab(minute="*/1"),
         }
     },
-    timezone='UTC',
+    timezone="UTC",
 )
-# GeoIP reader
-GEOIP_READER = geoip2.database.Reader('data/GeoLite2-City.mmdb')
+
+# ---------- GeoIP ----------
+try:
+    GEOIP_READER = geoip2.database.Reader("data/GeoLite2-City.mmdb")
+except FileNotFoundError:
+    GEOIP_READER = None
+    logger.warning("⚠️ GeoLite2-City.mmdb not found. Falling back to 'unknown' country")
 
 
 def parse_user_agent(ua_string: str):
     ua = user_agents.parse(ua_string)
-    # return normalized device + browser
-    device = "other"
     if ua.is_mobile:
         device = "mobile"
     elif ua.is_tablet:
         device = "tablet"
     elif ua.is_pc:
         device = "pc"
+    else:
+        device = "other"
     browser = ua.browser.family.lower() or "unknown"
     return device, browser
 
 
 def get_country_from_ip(ip: str) -> str:
+    if not GEOIP_READER:
+        return "unknown"
     try:
         response = GEOIP_READER.city(ip)
         return response.country.iso_code.lower() if response.country.iso_code else "unknown"
@@ -61,17 +74,29 @@ def get_country_from_ip(ip: str) -> str:
         return "unknown"
 
 
+# ---------------- Celery Tasks ----------------
+
 @celery.task(bind=True, max_retries=3, default_retry_delay=5)
-def log_click(self, url_id: str, ip: str, user_agent: str, referrer: str):
+def log_click(self, url_id: str, ip: str, user_agent: str, referrer: str, fingerprint: str):
+    """
+    Log a click event:
+    - Stores click in DB
+    - Updates Prometheus metrics
+    - Updates analytics
+    """
+    conn = None
+    cursor = None
     try:
         country = get_country_from_ip(ip)
         device, browser = parse_user_agent(user_agent or "")
+        click_id = str(uuid4())
+        now = datetime.utcnow()
+        date_str = now.strftime("%Y-%m-%d")
+        hour = now.hour
 
+        # --- DB ---
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
-        click_id = str(uuid4())
-
-        # DB insert
         cursor.execute(
             """
             INSERT INTO url_clicks (id, url_id, ip, user_agent, referrer)
@@ -79,16 +104,13 @@ def log_click(self, url_id: str, ip: str, user_agent: str, referrer: str):
             """,
             (click_id, url_id, ip, user_agent, referrer)
         )
-        cursor.execute("UPDATE urls SET clicks = clicks + 1 WHERE id=%s", (url_id,))
+        cursor.execute(
+            "UPDATE urls SET clicks = clicks + 1 WHERE id=%s",
+            (url_id,)
+        )
         conn.commit()
 
-        # Analytics & Metrics
-        now = datetime.utcnow()
-        date_str = now.strftime("%Y-%m-%d")
-        hour = now.hour
-        fingerprint = get_fingerprint()
-
-        # 🔹 Prometheus metrics
+        # --- Metrics ---
         UNIQUE_VISITORS.labels(url=url_id, date=date_str).inc()
         if referrer:
             TOP_REFERRERS.labels(url=url_id, referrer=referrer).inc()
@@ -97,21 +119,28 @@ def log_click(self, url_id: str, ip: str, user_agent: str, referrer: str):
         CLICKS_BY_BROWSER.labels(url=url_id, browser=browser).inc()
         CLICKS_BY_HOUR.labels(url=url_id).observe(hour)
 
-        # 🔹 Analytics tables
+        # --- Analytics ---
         increment_hourly_analytics(url_id, fingerprint, suspicious=False)
         update_user_sequence(fingerprint, url_id)
 
     except Exception as e:
-        logger.error(f"Error logging click: {e}")
+        logger.error(f"Error logging click: {e}", exc_info=True)
         raise self.retry(exc=e)
     finally:
-        cursor.close()  # type: ignore
-        conn.close()  # type: ignore
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 
 @celery.task(bind=True, max_retries=3, default_retry_delay=5)
-def check_fraud(self, ip: str, url_id: str, user_agent: str, referrer: str):
-    fingerprint = get_fingerprint()
+def check_fraud(self, ip: str, url_id: str, user_agent: str, referrer: str, fingerprint: str):
+    """
+    Detect suspicious activity:
+    - Checks heuristic fraud rules
+    - Stores suspicious clicks
+    - Updates analytics & metrics
+    """
     suspicious = (
         is_fraud(ip, url_id, user_agent, referrer) or
         check_velocity(fingerprint) or
@@ -119,14 +148,15 @@ def check_fraud(self, ip: str, url_id: str, user_agent: str, referrer: str):
     )
 
     if suspicious:
-        logger.warning(f"Suspicious click detected: ip={ip}, url={url_id}, fingerprint={fingerprint}")
+        logger.warning(f"🚨 Suspicious click: ip={ip}, url={url_id}, fingerprint={fingerprint}")
 
-        # Increment general suspicious counter
+        # --- Prometheus Metrics ---
         SUSPICIOUS_REQUESTS.labels(type="task_detected").inc()
         SUSPICIOUS_CLICKS.labels(url=url_id, type="heuristic_detected").inc()
-        SUSPICIOUS_IPS.inc()  # Current number of suspicious IPs
-        SUSPICIOUS_IP_URLS.inc()  # Current number of IP+URL combinations flagged
+        SUSPICIOUS_IPS.inc()
+        SUSPICIOUS_IP_URLS.inc()
 
+        # --- Store in DB ---
         conn = None
         cursor = None
         try:
@@ -142,26 +172,33 @@ def check_fraud(self, ip: str, url_id: str, user_agent: str, referrer: str):
             )
             conn.commit()
 
-            # Analytics update
+            # Analytics for suspicious click
             increment_hourly_analytics(url_id, fingerprint, suspicious=True)
 
         except Exception as e:
-            logger.error(f"Error logging suspicious click: {e}")
+            logger.error(f"Error logging suspicious click: {e}", exc_info=True)
             raise self.retry(exc=e)
         finally:
             if cursor:
                 cursor.close()
             if conn:
-                conn.close()
+                safe_close(conn)
 
     return suspicious
 
 
 @celery.task
-def update_trending_urls(top_n:int=20):
-    conn=get_connection()
-    cursor = conn.cursor(dictionary=True)
+def update_trending_urls(top_n: int = 20):
+    """
+    Updates trending URLs based on last 4 hours of hourly analytics
+    Stores result in MySQL and Redis
+    """
+    conn = None
+    cursor = None
     try:
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
         cursor.execute("""
             SELECT url_id,
                 SUM(
@@ -175,16 +212,26 @@ def update_trending_urls(top_n:int=20):
             FROM url_analytics_hourly
             WHERE date_hour >= NOW() - INTERVAL 4 HOUR
             GROUP BY url_id
-        """)
-        trending=cursor.fetchall()
-        # Update DB
+            ORDER BY trending_score DESC
+            LIMIT %s
+        """, (top_n,))
+        trending = cursor.fetchall()
+
         for row in trending:
             cursor.execute(
                 "UPDATE urls SET trending_score=%s WHERE id=%s",
-                (row['trending_score'], row['url_id'])
+                (row["trending_score"], row["url_id"])
             )
         conn.commit()
-        redis_client.set("trending_urls",json.dumps(trending))
+
+        # Store in Redis
+        redis_client.set("trending_urls", json.dumps(trending))
+        logger.info(f"✅ Updated trending URLs ({len(trending)} rows)")
+
+    except Exception as e:
+        logger.error(f"Error updating trending URLs: {e}", exc_info=True)
     finally:
-        cursor.close()
-        conn.close()    
+        if cursor:
+            cursor.close()
+        if conn:
+            safe_close(conn)

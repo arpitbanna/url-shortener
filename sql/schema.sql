@@ -92,6 +92,10 @@ CREATE TABLE IF NOT EXISTS url_analytics_hourly (
     PRIMARY KEY(url_id, date_hour),
     CONSTRAINT fk_analytics_url FOREIGN KEY (url_id) REFERENCES urls(id) ON DELETE CASCADE
 );
+ALTER TABLE url_analytics_hourly ADD COLUMN fingerprint CHAR(64) NOT NULL AFTER url_id;
+ALTER TABLE url_analytics_hourly
+DROP PRIMARY KEY,
+ADD PRIMARY KEY (url_id, fingerprint, date_hour);
 
 CREATE INDEX idx_analytics_url_hour ON url_analytics_hourly(url_id, date_hour);
 

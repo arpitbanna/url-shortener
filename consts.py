@@ -1,13 +1,18 @@
 import os
+from dotenv import load_dotenv
+
+# Load .env file if present
+load_dotenv()
+
 #Redis  
 REDIS_HOST=os.environ.get("REDIS_HOST", "redis")
 REDIS_PORT=int(os.environ.get("REDIS_PORT", 6379))
 
 #Database
-DB_HOST=os.environ.get("MYSQL_HOST", "db"),
-DB_USER=os.environ.get("MYSQL_USER", "root"),
-DB_PASSWORD=os.environ.get("MYSQL_PASSWORD", "example"),
-DB_DATABASE=os.environ.get("MYSQL_DB", "urlshortener"),
+DB_HOST=os.environ.get("MYSQL_HOST", "db")
+DB_USER=os.environ.get("MYSQL_USER", "root")
+DB_PASSWORD=os.environ.get("MYSQL_PASSWORD", "example")
+DB_DATABASE=os.environ.get("MYSQL_DB", "urlshortener")
 
 #Rate limiting
 RATE_LIMIT = 10 

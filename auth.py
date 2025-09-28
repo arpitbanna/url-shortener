@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 from flask import request, jsonify
 from uuid import uuid4
+import hashlib
 PRIVATE_KEY = open(os.environ.get("JWT_PRIVATE_KEY", "private.pem"), "r").read()
 PUBLIC_KEY = open(os.environ.get("JWT_PUBLIC_KEY", "public.pem"), "r").read()
 
@@ -24,8 +25,11 @@ def hash_password(password: str) -> str:
 def check_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password.encode(), password_hash.encode())
 
-def hash_token(token:str)->str:
-    return bcrypt.hashpw(token.encode(),bcrypt.gensalt()).decode()
+def hash_token(token: str) -> str:
+    # Convert token to fixed-length SHA256 digest
+    token_digest = hashlib.sha256(token.encode('utf-8')).digest()
+    hashed = bcrypt.hashpw(token_digest, bcrypt.gensalt())
+    return hashed.decode('utf-8')
 
 # ---------------------------
 # JWT Helpers
