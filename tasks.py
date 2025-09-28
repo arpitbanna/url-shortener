@@ -7,7 +7,7 @@ from celery import Celery
 from celery.schedules import crontab
 import geoip2.database
 import user_agents
-
+from decimal import Decimal
 from db import get_connection, redis_client,safe_close
 from consts import REDIS_HOST, REDIS_PORT
 from fraud import is_fraud, check_velocity, check_behavior
@@ -24,6 +24,13 @@ from metrics import (
     SUSPICIOUS_REQUESTS
 )
 from analytics import increment_hourly_analytics, update_user_sequence
+
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, obj): # type: ignore
+        if isinstance(obj, Decimal):
+            return float(obj)   # or str(obj) if you prefer exact
+        return super(DecimalEncoder, self).default(obj)
+
 
 # ---------- Logging ----------
 logging.basicConfig(level=logging.INFO)
@@ -225,7 +232,7 @@ def update_trending_urls(top_n: int = 20):
         conn.commit()
 
         # Store in Redis
-        redis_client.set("trending_urls", json.dumps(trending))
+        redis_client.set("trending_urls", json.dumps(trending, cls=DecimalEncoder))
         logger.info(f"✅ Updated trending URLs ({len(trending)} rows)")
 
     except Exception as e:
