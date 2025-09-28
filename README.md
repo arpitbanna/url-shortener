@@ -27,7 +27,7 @@ This is a **scalable URL shortener** focused on **performance, security, and obs
 
 **Core Capabilities:**
 
-* **Shortening:** Automatic or custom short codes for URLs.  
+* **Shortening:** Automatic short codes for URLs.  
 * **Analytics:** Track clicks, unique visitors, and referrers.  
 * **Security:** Fraud detection and strict rate limiting.  
 * **Trending URLs:** Weighted scoring based on recent activity.  
