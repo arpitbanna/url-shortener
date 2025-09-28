@@ -16,7 +16,20 @@ scrape_configs:
       - targets: ['redis:9121']  # default Redis exporter port
 
   # 3️⃣ MySQL metrics via official MySQL exporter
-  - job_name: 'mysql'
-    metrics_path: /metrics
+  - job_name: mysql # To get metrics about the mysql exporter’s targets
+    metrics_path: /probe
+    params:
+        auth_module: [client.servers]
     static_configs:
-      - targets: ['mysql-exporter:9104']
+        - targets:
+          - db:3306
+          - db:3306
+          - mysql-exporter:9041
+    relabel_configs:
+        - source_labels: [__address__]
+          target_label: __param_target
+        - source_labels: [__param_target]
+          target_label: instance
+        - target_label: __address__
+          # The mysqld_exporter host:port
+          replacement: localhost:9104

@@ -138,3 +138,9 @@ CREATE TABLE IF NOT EXISTS user_statistics (
 );
 
 CREATE INDEX idx_user_statistics ON user_statistics(fingerprint);
+
+
+-- For exporter
+CREATE USER 'exporter'@'%' IDENTIFIED BY 'exporterpass';
+GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO 'exporter'@'%';
+FLUSH PRIVILEGES;

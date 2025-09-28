@@ -83,14 +83,17 @@ services:
   mysql-exporter:
     image: prom/mysqld-exporter:latest
     container_name: mysql-exporter
-    environment:
-      - DATA_SOURCE_NAME=root:example@(mysql-db:3306)/urlshortener
+    command:
+      - '--config.my-cnf=/cfg/.my.cnf'
+    volumes:
+    - ./my.cnf:/cfg/.my.cnf:ro
     ports:
-      - "9104:9104"
+    - "9104:9104"
     networks:
-      - monitoring
+    - monitoring
     depends_on:
-      - db
+     - db
+
 
     
     
