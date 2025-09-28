@@ -115,5 +115,5 @@ Prometheus (Metrics)
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/yourusername/url-shortener.git
+git clone https://github.com/SysTechSalihY/url-shortener.git
 cd url-shortener
