@@ -93,10 +93,8 @@ services:
     - monitoring
     depends_on:
      - db
-
-
-    
-    
+  
+  
 volumes:
   mysql-data:
   redis-data:
