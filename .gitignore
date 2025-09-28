@@ -2,3 +2,4 @@ __pycache__/
 .env
 *.pem
 data/
+.pytest_cache/
