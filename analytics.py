@@ -31,8 +31,10 @@ def increment_hourly_analytics(url_id, fingerprint, suspicious=False):
         except Exception:
             pass  # Ignore connection errors on close
 
-def update_url_referres(url_id:str,referrer:str):
+def update_url_referres(url_id:str,referrer:str|None):
     try:
+        if not referrer:
+          referrer = "unknown"
         conn = get_connection()
         cursor = conn.cursor()
 

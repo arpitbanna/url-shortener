@@ -115,7 +115,7 @@ CREATE INDEX idx_sequences_last_update ON user_sequences(last_update);
 -- =====================================
 CREATE TABLE IF NOT EXISTS url_referrers (
     url_id CHAR(36),
-    referrer TEXT,
+    referrer VARCHAR(500),
     clicks INT DEFAULT 0,
     PRIMARY KEY(url_id, referrer),
     CONSTRAINT fk_referrers_url FOREIGN KEY (url_id) REFERENCES urls(id) ON DELETE CASCADE
