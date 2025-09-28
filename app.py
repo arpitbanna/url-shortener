@@ -349,6 +349,7 @@ def stats(code: str):
 
 @app.route("/analytics/<code>", methods=["GET"])
 @jwt_required(token_type="access")
+@handle_errors
 def analytics(code: str):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)

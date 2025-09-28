@@ -31,6 +31,25 @@ def increment_hourly_analytics(url_id, fingerprint, suspicious=False):
         except Exception:
             pass  # Ignore connection errors on close
 
+def update_url_referres(url_id:str,referrer:str):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT INTO url_referrers (url_id, referrer, clicks)
+            VALUES (%s, %s, 1)
+            ON DUPLICATE KEY UPDATE clicks = clicks + 1
+            """,
+            (url_id, referrer))
+        conn.commit()
+    finally:
+        try:
+            safe_close(conn) # type: ignore
+            cursor.close() #type: ignore
+        except Exception:
+            pass  # Ignore connection errors on close
+
 
 def update_user_sequence(fingerprint: str, url_code: str, max_length: int = 10):
     conn = get_connection()

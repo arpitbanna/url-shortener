@@ -23,7 +23,7 @@ from metrics import (
     SUSPICIOUS_IPS,
     SUSPICIOUS_REQUESTS
 )
-from analytics import increment_hourly_analytics, update_user_sequence
+from analytics import increment_hourly_analytics, update_user_sequence,update_url_referres
 
 class DecimalEncoder(json.JSONEncoder):
     def default(self, obj): # type: ignore
@@ -129,7 +129,7 @@ def log_click(self, url_id: str, ip: str, user_agent: str, referrer: str, finger
         # --- Analytics ---
         increment_hourly_analytics(url_id, fingerprint, suspicious=False)
         update_user_sequence(fingerprint, url_id)
-
+        update_url_referres(url_id=url_id,referrer=referrer)
     except Exception as e:
         logger.error(f"Error logging click: {e}", exc_info=True)
         raise self.retry(exc=e)
