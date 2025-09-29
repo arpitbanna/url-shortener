@@ -225,7 +225,7 @@ def logout():
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "DELETE FROM refresh_tokens WHERE token_hash=%s AND user_id=%s",
+            "DELETE FROM refresh_tokens WHERE id=%s AND user_id=%s",
             (jti, user_id)
         )
         conn.commit()

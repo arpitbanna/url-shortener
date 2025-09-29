@@ -106,7 +106,7 @@ Prometheus (Metrics)
 ## ⚡ Prerequisites
 
 * Docker & Docker Compose  
-* Python 3.11 (if running Flask outside Docker)
+* Python 3.11 
 
 ---
 
