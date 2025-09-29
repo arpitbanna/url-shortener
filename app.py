@@ -279,9 +279,6 @@ def shorten_url():
 @app.route("/<code>")
 @handle_errors
 def redirect_url(code: str):
-    ip =get_client_ip()
-    user_agent = request.headers.get("User-Agent")
-    referrer = request.referrer
     # Try Redis first
     original_url = redis_client.get(code)
     url_id = None
