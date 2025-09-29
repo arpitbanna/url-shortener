@@ -45,7 +45,7 @@ This is a **scalable URL shortener** focused on **performance, security, and obs
 | Category | Feature | Description |
 | :--- | :--- | :--- |
 | **Authentication** | Secure Access | Sign up, login, and refresh tokens via **JWT**. |
-| **URL Management** | Custom Codes | Auto-generate or allow user-defined short codes. |
+| **URL Management** | Custom Codes | Auto-generate  short codes. |
 | **Performance** | Fast Redirects | Low-latency redirects leveraging **Redis caching**. |
 | **Analytics** | Click Tracking | Async logging with hourly aggregation of clicks, unique visitors, and top referrers. |
 | **Trending** | Weighted Score | Exponential decay scoring for recent activity on URLs. |
