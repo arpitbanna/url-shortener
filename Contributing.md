@@ -8,8 +8,6 @@ Thank you for your interest in contributing to the URL Shortener API! Contributi
 
 All contributions should adhere to the following standards:
 
-* Follow **PEP8** guidelines for Python code.  
-* Write **clean, modular, and reusable code**.  
 * Include **meaningful comments and docstrings** where necessary.  
 * Ensure compatibility with **Python 3.11**.  
 * Maintain **high test coverage** and include unit tests for new functionality.  
@@ -31,24 +29,6 @@ All contributions should adhere to the following standards:
 * Clearly describe bugs or unexpected behavior.  
 * Include relevant details such as steps to reproduce, screenshots, logs, and environment information.  
 * Feature requests should explain the proposed functionality, use case, and potential benefits.
-
----
-
-## Testing & Validation
-
-* Ensure all existing and new tests pass.  
-* Use **flake8** or **pylint** to maintain code quality.  
-* Validate that new features do not introduce regressions.  
-* Include any necessary test data or mocks for reproducibility.
-
----
-
-## Collaboration and Communication
-
-* Be respectful, constructive, and professional in all interactions.  
-* Engage in **positive discussions** when reviewing or discussing contributions.  
-* Avoid offensive or discriminatory language.  
-* Follow the [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for detailed guidelines.
 
 ---
 
